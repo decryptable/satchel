@@ -50,3 +50,6 @@ jobs:
 
       - name: Deploy latest documentation
         run: mike deploy $VERSION --branch gh-pages --push
+
+      - name: Set default version
+        run: mike set-default $VERSION --branch gh-pages --push
