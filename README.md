@@ -6,9 +6,9 @@
 
 <div align="center">
 
-  [![CI](https://github.com/ryanlua/satchel/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanlua/satchel/actions/workflows/ci.yml)
-  [![GitHub Release](https://img.shields.io/github/v/release/ryanlua/satchel)](https://github.com/ryanlua/satchel/releases)
-  [![Docs](https://img.shields.io/badge/docs-website-green)](https://satchel.luau.page/)
+  [![CI](https://github.com/decryptable/satchel/actions/workflows/ci.yml/badge.svg)](https://github.com/decryptable/satchel/actions/workflows/ci.yml)
+  [![GitHub Release](https://img.shields.io/github/v/release/decryptable/satchel)](https://github.com/decryptable/satchel/releases)
+  [![Docs](https://img.shields.io/badge/docs-website-green)](https://satchel.decryptable.dev/)
   [![Playground](https://img.shields.io/badge/playground-experience-blue)](https://www.roblox.com/games/13592168150)
   [![Discord](https://discord.com/api/guilds/1162303282002272359/widget.png)](https://discord.gg/N2KEnHzrsW)
   [![Mentioned in Awesome Roblox](https://awesome.re/mentioned-badge.svg)](https://github.com/awesome-roblox/awesome-roblox)
@@ -27,9 +27,9 @@ Satchel is a modern open-source alternative to Roblox's default backpack. Satche
 
 ## Documentation
 
-See the [documentation site](https://satchel.luau.page) for more about Satchel. Find guides on how to get started, learn about the API, understand what Satchel is, and more.
+See the [documentation site](https://satchel.decryptable.dev) for more about Satchel. Find guides on how to get started, learn about the API, understand what Satchel is, and more.
 
-If you see anything wrong, open a new [documentation issue](https://github.com/ryanlua/satchel/issues/new?template=documentation_issue.yml).
+If you see anything wrong, open a new [documentation issue](https://github.com/decryptable/satchel/issues/new?template=documentation_issue.yml).
 
 ## Sponsors
 
@@ -49,7 +49,7 @@ Special thanks for our sponsors for supporting Satchel and it's future developme
 
 <br>
 
-[Become a sponsor](https://github.com/sponsors/ryanlua)
+[Become a sponsor](https://github.com/sponsors/decryptable)
 
 ## Contributing
 

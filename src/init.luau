@@ -58,7 +58,7 @@ local BACKGROUND_COLOR: Color3 = targetScript:GetAttribute("BackgroundColor3")
 local SLOT_EQUIP_COLOR: Color3 = targetScript:GetAttribute("EquipBorderColor3") or Color3.new(0 / 255, 162 / 255, 1)
 local SLOT_LOCKED_TRANSPARENCY_DEFAULT: number = targetScript:GetAttribute("BackgroundTransparency") or 0.3 -- Locked means undraggable
 local SLOT_LOCKED_TRANSPARENCY: number = SLOT_LOCKED_TRANSPARENCY_DEFAULT * PREFERRED_TRANSPARENCY
-local SLOT_EQUIP_THICKNESS: number = targetScript:GetAttribute("EquipBorderSizePixel") or 5 -- Relative
+local SLOT_EQUIP_THICKNESS: number = targetScript:GetAttribute("EquipBorderSizePixel") or 0.5 -- Relative - thinner border for selected items
 local SLOT_CORNER_RADIUS: UDim = targetScript:GetAttribute("CornerRadius") or UDim.new(0, 8)
 local SLOT_BORDER_COLOR: Color3 = Color3.new(1, 1, 1) -- Appears when dragging
 
@@ -116,6 +116,13 @@ local ZERO_KEY_VALUE: number = Enum.KeyCode.Zero.Value
 local DOUBLE_CLICK_TIME: number = 0.5
 local ICON_BUFFER_PIXELS: number = 5
 local ICON_SIZE_PIXELS: number = 60
+
+-- Favorite system
+local FAVORITE_ICON: string = "⭐" -- Star emoji
+local FAVORITE_ICON_SIZE: number = 10 -- Small size
+local FAVORITE_COLOR: Color3 = Color3.fromRGB(255, 215, 0) -- Gold
+local FAVORITE_BACKGROUND_COLOR: Color3 = Color3.fromRGB(80, 70, 40) -- Golden/bronze background for favoritable items
+local LONG_PRESS_TIME: number = 0.5
 
 local MOUSE_INPUT_TYPES: { [Enum.UserInputType]: boolean } =
 	{ -- These are the input types that will be used for mouse -- [[ADDED]], Optional
@@ -215,6 +222,7 @@ local NumberOfInventoryRows: number = IsVR and INVENTORY_ROWS_VR
 	or (IS_PHONE and INVENTORY_ROWS_MINI or INVENTORY_ROWS_FULL) -- How many rows in the popped-up inventory
 local BackpackPanel = nil
 local lastEquippedSlot: any = nil
+local UpdateFavoritesFilter: (() -> ())? = nil -- Will be set later, used to update filter display in real-time
 
 local function EvaluateBackpackPanelVisibility(enabled: boolean): boolean
 	return enabled and inventoryIcon.enabled and BackpackEnabled and VRService.VREnabled
@@ -359,6 +367,59 @@ local function IsEquipped(tool: Tool): boolean
 	return tool and tool.Parent == Character --NOTE: HopperBin
 end
 
+-- Check if a tool can be favorited
+-- By default, tools cannot be favorited unless they have the CanBeFavorited attribute set to true
+-- This prevents favoriting of default items like fishing rods, coils, etc.
+local function CanBeFavorited(tool: Tool): boolean
+	if not tool or not tool:IsA("Tool") then
+		return false
+	end
+	
+	-- Check if the tool has the CanBeFavorited attribute set to true
+	return tool:GetAttribute("CanBeFavorited") == true
+end
+
+-- Sort inventory slots by favorite status and timestamp
+local function SortInventorySlots(): ()
+	-- Get all inventory slots (not hotbar)
+	local inventorySlots: { any } = {}
+	for i: number = NumberOfHotbarSlots + 1, #Slots do
+		if Slots[i] and Slots[i].Tool then
+			table.insert(inventorySlots, Slots[i])
+		end
+	end
+	
+	-- Sort by favorite status (favorited first) then by timestamp (most recent first)
+	table.sort(inventorySlots, function(a: any, b: any): boolean
+		local aFavorited: boolean = a.Tool:GetAttribute("IsFavorited") == true
+		local bFavorited: boolean = b.Tool:GetAttribute("IsFavorited") == true
+		
+		-- If one is favorited and the other isn't, prioritize favorited
+		if aFavorited and not bFavorited then
+			return true
+		elseif not aFavorited and bFavorited then
+			return false
+		end
+		
+		-- If both are favorited, sort by timestamp (most recent first)
+		if aFavorited and bFavorited then
+			local aTime: number = a.Tool:GetAttribute("FavoritedTime") or 0
+			local bTime: number = b.Tool:GetAttribute("FavoritedTime") or 0
+			return aTime > bTime
+		end
+		
+		-- If neither is favorited, maintain relative order
+		return false
+	end)
+	
+	-- Reorder the slots based on sorted order
+	for i: number, slot: any in ipairs(inventorySlots) do
+		local newIndex: number = NumberOfHotbarSlots + i
+		slot.Index = newIndex
+		slot.Frame.LayoutOrder = newIndex
+	end
+end
+
 -- Create a slot
 local function MakeSlot(parent: Instance, initIndex: number?): GuiObject
 	local index: number = initIndex or (#Slots + 1)
@@ -377,6 +438,7 @@ local function MakeSlot(parent: Instance, initIndex: number?): GuiObject
 	local ToolChangeConn: any = nil
 	local HighlightFrame: any = nil -- UIStroke
 	local SelectionObj: ImageLabel = nil
+	local FavoriteIcon: TextLabel = nil
 
 	--NOTE: The following are only defined for Hotbar Slots
 	local ToolTip: TextLabel = nil
@@ -472,6 +534,16 @@ local function MakeSlot(parent: Instance, initIndex: number?): GuiObject
 
 		SlotsByTool[tool] = self
 		LowestEmptySlot = FindLowestEmpty()
+
+		-- Update slot appearance for favoritable items
+		if CanBeFavorited(tool) then
+			SlotFrame.BackgroundColor3 = FAVORITE_BACKGROUND_COLOR
+		end
+
+		-- Update favorite icon visibility
+		if FavoriteIcon then
+			FavoriteIcon.Visible = self:IsFavorited()
+		end
 	end
 
 	-- Empty the slot of any tool data
@@ -508,6 +580,14 @@ local function MakeSlot(parent: Instance, initIndex: number?): GuiObject
 		SlotsByTool[self.Tool] = nil
 		self.Tool = nil
 		LowestEmptySlot = FindLowestEmpty()
+
+		-- Reset background color to default
+		SlotFrame.BackgroundColor3 = BACKGROUND_COLOR
+
+		-- Hide favorite icon
+		if FavoriteIcon then
+			FavoriteIcon.Visible = false
+		end
 	end
 
 	function slot:UpdateEquipView(unequippedOverride: boolean?): ...any
@@ -536,6 +616,46 @@ local function MakeSlot(parent: Instance, initIndex: number?): GuiObject
 
 	function slot:IsEquipped(): boolean
 		return IsEquipped(self.Tool)
+	end
+
+	-- Favorite system methods
+	function slot:IsFavorited(): boolean
+		if not self.Tool or not CanBeFavorited(self.Tool) then
+			return false
+		end
+		return self.Tool:GetAttribute("IsFavorited") == true
+	end
+
+	function slot:ToggleFavorite(): ...any
+		if not self.Tool or not CanBeFavorited(self.Tool) then
+			return
+		end
+
+		local currentlyFavorited: boolean = self:IsFavorited()
+		local newFavoritedState: boolean = not currentlyFavorited
+		self.Tool:SetAttribute("IsFavorited", newFavoritedState)
+		
+		-- Set timestamp when favoriting
+		if newFavoritedState then
+			self.Tool:SetAttribute("FavoritedTime", os.time())
+		else
+			self.Tool:SetAttribute("FavoritedTime", nil)
+		end
+
+		-- Update visual indicator
+		if FavoriteIcon then
+			FavoriteIcon.Visible = newFavoritedState
+		end
+		
+		-- Trigger resort of inventory
+		if self.Index > NumberOfHotbarSlots then
+			SortInventorySlots()
+		end
+		
+		-- Update filter display if in filter mode
+		if UpdateFavoritesFilter then
+			UpdateFavoritesFilter()
+		end
 	end
 
 	function slot:Delete(): ...any
@@ -634,6 +754,39 @@ local function MakeSlot(parent: Instance, initIndex: number?): GuiObject
 	SlotFrame.MouseButton1Click:Connect(function(): ()
 		changeSlot(slot)
 	end)
+
+	-- Right-click to toggle favorite (desktop)
+	SlotFrame.MouseButton2Click:Connect(function(): ()
+		slot:ToggleFavorite()
+	end)
+
+	-- Long-press to toggle favorite (touch/mobile)
+	local longPressStart: number = 0
+	local longPressThread: thread = nil
+
+	SlotFrame.InputBegan:Connect(function(input: InputObject): ()
+		if input.UserInputType == Enum.UserInputType.Touch then
+			longPressStart = os.clock()
+
+			-- Set up a delayed check for long press
+			longPressThread = task.delay(LONG_PRESS_TIME, function(): ()
+				if longPressStart > 0 and (os.clock() - longPressStart) >= LONG_PRESS_TIME then
+					slot:ToggleFavorite()
+					longPressStart = 0  -- Reset to prevent multiple triggers
+				end
+			end)
+		end
+	end)
+
+	SlotFrame.InputEnded:Connect(function(input: InputObject): ()
+		if input.UserInputType == Enum.UserInputType.Touch then
+			-- If released before long press time, cancel the long press
+			if longPressThread then
+				task.cancel(longPressThread)
+			end
+			longPressStart = 0
+		end
+	end)
 	local searchFrameCorner: UICorner = Instance.new("UICorner")
 	searchFrameCorner.Name = "Corner"
 	searchFrameCorner.CornerRadius = SLOT_CORNER_RADIUS
@@ -694,6 +847,29 @@ local function MakeSlot(parent: Instance, initIndex: number?): GuiObject
 	ToolName.TextWrapped = true
 	ToolName.TextTruncate = Enum.TextTruncate.AtEnd
 	ToolName.Parent = SlotFrame
+
+	-- Favorite icon (emoji)
+	FavoriteIcon = Instance.new("TextLabel")
+	FavoriteIcon.Name = "FavoriteIcon"
+	FavoriteIcon.BackgroundTransparency = 1
+	FavoriteIcon.Text = FAVORITE_ICON
+	FavoriteIcon.TextColor3 = FAVORITE_COLOR
+	FavoriteIcon.TextSize = FAVORITE_ICON_SIZE
+	FavoriteIcon.Size = UDim2.fromOffset(FAVORITE_ICON_SIZE + 4, FAVORITE_ICON_SIZE + 4)
+	FavoriteIcon.Position = UDim2.new(1, -2, 1, -2) -- Bottom right corner
+	FavoriteIcon.AnchorPoint = Vector2.new(1, 1)
+	FavoriteIcon.ZIndex = 3
+	FavoriteIcon.Visible = false
+	FavoriteIcon.TextXAlignment = Enum.TextXAlignment.Center
+	FavoriteIcon.TextYAlignment = Enum.TextYAlignment.Center
+	FavoriteIcon.Parent = SlotFrame
+
+	-- Add stroke to favorite icon for better visibility
+	local favoriteStroke: UIStroke = Instance.new("UIStroke")
+	favoriteStroke.Thickness = 1.5
+	favoriteStroke.Color = Color3.new(0, 0, 0)
+	favoriteStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	favoriteStroke.Parent = FavoriteIcon
 
 	slot.Frame.LayoutOrder = slot.Index
 
@@ -1891,6 +2067,174 @@ do -- Search stuff
 	xImage.BorderSizePixel = 0
 	xImage.Parent = xButton
 
+	-- Favorites Control Panel Frame (above inventory)
+	local favoritesControlPanel: Frame = Instance.new("Frame")
+	favoritesControlPanel.Name = "FavoritesControlPanel"
+	favoritesControlPanel.BackgroundColor3 = BACKGROUND_COLOR
+	favoritesControlPanel.BackgroundTransparency = BACKGROUND_TRANSPARENCY
+	favoritesControlPanel.Size = UDim2.new(1, 0, 0, 50)
+	favoritesControlPanel.Position = UDim2.new(0, 0, 0, -(50 + ICON_BUFFER_PIXELS))
+	favoritesControlPanel.Parent = InventoryFrame
+
+	local controlPanelCorner: UICorner = Instance.new("UICorner")
+	controlPanelCorner.CornerRadius = BACKGROUND_CORNER_RADIUS
+	controlPanelCorner.Parent = favoritesControlPanel
+
+	-- Helper text
+	local helperText: TextLabel = Instance.new("TextLabel")
+	helperText.Name = "FavoriteHelperText"
+	helperText.BackgroundTransparency = 1
+	helperText.Text = "Right-click or long-press to favorite.\nContributor: san (@hack_byte)"
+	helperText.TextColor3 = Color3.fromRGB(200, 200, 200)
+	helperText.TextSize = 12
+	helperText.FontFace = Font.new(FONT_FAMILY.Family, Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+	helperText.TextXAlignment = Enum.TextXAlignment.Left
+	helperText.TextYAlignment = Enum.TextYAlignment.Center
+	helperText.TextWrapped = false
+	helperText.Size = UDim2.new(0.5, -10, 1, 0)
+	helperText.Position = UDim2.new(0, 10, 0, 0)
+	helperText.ZIndex = 2
+	helperText.Parent = favoritesControlPanel
+
+	-- Futuristic Toggle Switch
+	local showOnlyFavorites: boolean = false
+	local toggleContainer: Frame = Instance.new("Frame")
+	toggleContainer.Name = "ToggleContainer"
+	toggleContainer.BackgroundTransparency = 1
+	toggleContainer.Size = UDim2.new(0, 180, 0, 32)
+	toggleContainer.Position = UDim2.new(1, -190, 0.5, -16)
+	toggleContainer.Parent = favoritesControlPanel
+
+	-- Toggle track background
+	local toggleButton: TextButton = Instance.new("TextButton")
+	toggleButton.Name = "ToggleButton"
+	toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	toggleButton.BorderSizePixel = 0
+	toggleButton.Text = ""
+	toggleButton.Size = UDim2.new(0, 120, 0, 24)
+	toggleButton.Position = UDim2.new(0, 50, 0.5, -15)
+	toggleButton.Parent = toggleContainer
+
+	local toggleTrackCorner: UICorner = Instance.new("UICorner")
+	toggleTrackCorner.CornerRadius = UDim.new(0.5, 0) -- Fully rounded
+	toggleTrackCorner.Parent = toggleButton
+
+	-- Toggle track glow effect
+	local toggleGlow: UIStroke = Instance.new("UIStroke")
+	toggleGlow.Name = "Glow"
+	toggleGlow.Thickness = 1
+	toggleGlow.Color = Color3.fromRGB(100, 100, 100)
+	toggleGlow.Transparency = 0.5
+	toggleGlow.Parent = toggleButton
+
+	-- Toggle slider (the moving part)
+	local toggleSlider: Frame = Instance.new("Frame")
+	toggleSlider.Name = "Slider"
+	toggleSlider.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+	toggleSlider.BorderSizePixel = 0
+	toggleSlider.Size = UDim2.new(0, 20, 0, 20)
+	toggleSlider.Position = UDim2.new(0, 2, 0.5, -10)
+	toggleSlider.ZIndex = 2
+	toggleSlider.Parent = toggleButton
+
+	local sliderCorner: UICorner = Instance.new("UICorner")
+	sliderCorner.CornerRadius = UDim.new(1, 0) -- Perfect circle
+	sliderCorner.Parent = toggleSlider
+
+	-- Slider inner glow
+	local sliderGlow: UIStroke = Instance.new("UIStroke")
+	sliderGlow.Name = "InnerGlow"
+	sliderGlow.Thickness = 2
+	sliderGlow.Color = Color3.fromRGB(255, 255, 255)
+	sliderGlow.Transparency = 0.5
+	sliderGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	sliderGlow.Parent = toggleSlider
+
+	-- Toggle state text
+	local toggleStateText: TextLabel = Instance.new("TextLabel")
+	toggleStateText.Name = "StateText"
+	toggleStateText.BackgroundTransparency = 1
+	toggleStateText.Text = "All"
+	toggleStateText.TextColor3 = Color3.fromRGB(150, 150, 150)
+	toggleStateText.TextSize = 10
+	toggleStateText.FontFace = Font.new(FONT_FAMILY.Family, Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+	toggleStateText.TextXAlignment = Enum.TextXAlignment.Center
+	toggleStateText.Size = UDim2.new(1, 0, 1, 0)
+	toggleStateText.ZIndex = 1
+	toggleStateText.Parent = toggleButton
+
+	local function updateFilterDisplay(): ()
+		for i: number = NumberOfHotbarSlots + 1, #Slots do
+			local slot: any = Slots[i]
+			if slot and slot.Frame then
+				if showOnlyFavorites then
+					-- Only show favorited items
+					slot.Frame.Visible = slot:IsFavorited()
+				else
+					-- Show all items
+					slot.Frame.Visible = true
+				end
+			end
+		end
+	end
+	
+	-- Assign to global reference for real-time updates
+	UpdateFavoritesFilter = updateFilterDisplay
+
+	toggleButton.MouseButton1Click:Connect(function(): ()
+		showOnlyFavorites = not showOnlyFavorites
+		
+		-- Animate the toggle with TweenService
+		local TweenService: TweenService = game:GetService("TweenService")
+		local tweenInfo: TweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		
+		if showOnlyFavorites then
+			-- On state - move slider to right, change to golden
+			local sliderTween: Tween = TweenService:Create(toggleSlider, tweenInfo, {
+				Position = UDim2.new(1, -22, 0.5, -10)
+			})
+			local colorTween: Tween = TweenService:Create(toggleButton, tweenInfo, {
+				BackgroundColor3 = Color3.fromRGB(80, 70, 40)
+			})
+			local glowTween: Tween = TweenService:Create(toggleGlow, tweenInfo, {
+				Color = Color3.fromRGB(255, 215, 0)
+			})
+			local sliderColorTween: Tween = TweenService:Create(toggleSlider, tweenInfo, {
+				BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+			})
+			
+			sliderTween:Play()
+			colorTween:Play()
+			glowTween:Play()
+			sliderColorTween:Play()
+			toggleStateText.Text = "⭐ Favorites"
+			toggleStateText.TextColor3 = Color3.fromRGB(255, 215, 0)
+		else
+			-- Off state - move slider to left, gray
+			local sliderTween: Tween = TweenService:Create(toggleSlider, tweenInfo, {
+				Position = UDim2.new(0, 2, 0.5, -10)
+			})
+			local colorTween: Tween = TweenService:Create(toggleButton, tweenInfo, {
+				BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+			})
+			local glowTween: Tween = TweenService:Create(toggleGlow, tweenInfo, {
+				Color = Color3.fromRGB(100, 100, 100)
+			})
+			local sliderColorTween: Tween = TweenService:Create(toggleSlider, tweenInfo, {
+				BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+			})
+			
+			sliderTween:Play()
+			colorTween:Play()
+			glowTween:Play()
+			sliderColorTween:Play()
+			toggleStateText.Text = "All"
+			toggleStateText.TextColor3 = Color3.fromRGB(150, 150, 150)
+		end
+		
+		updateFilterDisplay()
+	end)
+
 	local function search(): ()
 		local terms: { [string]: boolean } = {}
 		for word: string in searchBox.Text:gmatch("%S+") do
@@ -2133,8 +2477,60 @@ function BackpackScript:IsOpened(): boolean
 end
 
 -- Returns on if the backpack is enabled or not
-function BackpackScript:GetBackpackEnabled(): boolean
+function BackpackScript:IsBackpackEnabled(): boolean
 	return BackpackEnabled
+end
+
+-- Favorite system API
+-- Sets the favorite status of a tool
+-- Only works on tools that have CanBeFavorited attribute set to true
+function BackpackScript:SetFavorite(tool: Tool, favorited: boolean): ()
+	if not tool or not tool:IsA("Tool") or not CanBeFavorited(tool) then
+		return
+	end
+	
+	tool:SetAttribute("IsFavorited", favorited)
+	
+	-- Update visual indicator if the tool is in a slot
+	local slot: any = SlotsByTool[tool]
+	if slot and slot.Frame and slot.Frame:FindFirstChild("FavoriteIcon") then
+		slot.Frame.FavoriteIcon.Visible = favorited
+	end
+end
+
+-- Checks if a tool is favorited
+-- Returns false if the tool cannot be favorited
+function BackpackScript:IsFavorited(tool: Tool): boolean
+	if not tool or not tool:IsA("Tool") or not CanBeFavorited(tool) then
+		return false
+	end
+	return tool:GetAttribute("IsFavorited") == true
+end
+
+-- Gets all favorited tools in the player's backpack and character
+-- Only includes tools that can be favorited
+function BackpackScript:GetFavoritedTools(): { Tool }
+	local favoritedTools: { Tool } = {}
+	
+	-- Check backpack
+	if Backpack then
+		for _, item: Instance in pairs(Backpack:GetChildren()) do
+			if item:IsA("Tool") and CanBeFavorited(item :: Tool) and item:GetAttribute("IsFavorited") == true then
+				table.insert(favoritedTools, item :: Tool)
+			end
+		end
+	end
+	
+	-- Check equipped (character)
+	if Character then
+		for _, item: Instance in pairs(Character:GetChildren()) do
+			if item:IsA("Tool") and CanBeFavorited(item :: Tool) and item:GetAttribute("IsFavorited") == true then
+				table.insert(favoritedTools, item :: Tool)
+			end
+		end
+	end
+	
+	return favoritedTools
 end
 
 -- Returns the BindableEvent for when the backpack state changes

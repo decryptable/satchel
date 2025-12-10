@@ -1,12 +1,12 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/ryanlua/templates/tree/main/src/roblox
+// README at: https://github.com/decryptable/templates/tree/main/src/roblox
 {
 	"name": "Roblox",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfil
 	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
 
 	"features": {
-		"ghcr.io/ryanlua/features/rojo:0.2.1": {
+		"ghcr.io/decryptable/features/rojo:0.2.1": {
 			"version": "latest",
 			"toolchainManager": "rokit"
 		},

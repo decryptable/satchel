@@ -45,7 +45,7 @@ This documentation will allow you to install Satchel and learn about how to scri
     [:material-arrow-right: Installation](installation.md)
 
   [Creator Store]: https://create.roblox.com/store/asset/13947506401
-  [GitHub Releases]: https://github.com/ryanlua/satchel/releases
+  [GitHub Releases]: https://github.com/decryptable/satchel/releases
 
 - :material-devices:{ .lg .middle } __Full device support__
 
@@ -71,9 +71,9 @@ This documentation will allow you to install Satchel and learn about how to scri
 
     Open source for everyone to use and available on [GitHub]
 
-    [:material-arrow-right: License](https://github.com/ryanlua/satchel#MPL-2.0-1-ov-file)
+    [:material-arrow-right: License](https://github.com/decryptable/satchel#MPL-2.0-1-ov-file)
 
-  [GitHub]: https://github.com/ryanlua/satchel
+  [GitHub]: https://github.com/decryptable/satchel
 
 </div>
 
@@ -94,4 +94,4 @@ Special thanks for our sponsors for supporting Satchel and it's future developme
 
 [:material-heart: Sponsor Satchel][sponsor]{ .md-button .md-button--primary }
 
-  [sponsor]: https://github.com/sponsors/ryanlua "Become a sponsor"
+  [sponsor]: https://github.com/sponsors/decryptable "Become a sponsor"
