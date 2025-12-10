@@ -14,7 +14,6 @@ local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local VRService = game:GetService("VRService")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PlayerGui: Instance = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 local BackpackScript = {}
@@ -2113,7 +2112,7 @@ do -- Search stuff
 	favoritesControlPanel.BackgroundColor3 = BACKGROUND_COLOR
 	favoritesControlPanel.BackgroundTransparency = BACKGROUND_TRANSPARENCY
 	favoritesControlPanel.Size = UDim2.new(1, 0, 0, 50)
-	favoritesControlPanel.Position = UDim2.new(0, 0, 0, -(50 + ICON_BUFFER_PIXELS))
+	favoritesControlPanel.Position = UDim2.fromOffset(0, -(50 + ICON_BUFFER_PIXELS))
 	favoritesControlPanel.Parent = InventoryFrame
 
 	local controlPanelCorner: UICorner = Instance.new("UICorner")
@@ -2132,7 +2131,7 @@ do -- Search stuff
 	helperText.TextYAlignment = Enum.TextYAlignment.Center
 	helperText.TextWrapped = false
 	helperText.Size = UDim2.new(0.5, -10, 1, 0)
-	helperText.Position = UDim2.new(0, 10, 0, 0)
+	helperText.Position = UDim2.fromOffset(10, 0)
 	helperText.ZIndex = 2
 	helperText.Parent = favoritesControlPanel
 
@@ -2141,7 +2140,7 @@ do -- Search stuff
 	local toggleContainer: Frame = Instance.new("Frame")
 	toggleContainer.Name = "ToggleContainer"
 	toggleContainer.BackgroundTransparency = 1
-	toggleContainer.Size = UDim2.new(0, 180, 0, 32)
+	toggleContainer.Size = UDim2.fromOffset(180, 32)
 	toggleContainer.Position = UDim2.new(1, -190, 0.5, -16)
 	toggleContainer.Parent = favoritesControlPanel
 
@@ -2151,7 +2150,7 @@ do -- Search stuff
 	toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 	toggleButton.BorderSizePixel = 0
 	toggleButton.Text = ""
-	toggleButton.Size = UDim2.new(0, 120, 0, 24)
+	toggleButton.Size = UDim2.fromOffset(120, 24)
 	toggleButton.Position = UDim2.new(0, 50, 0.5, -15)
 	toggleButton.Parent = toggleContainer
 
@@ -2172,7 +2171,7 @@ do -- Search stuff
 	toggleSlider.Name = "Slider"
 	toggleSlider.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
 	toggleSlider.BorderSizePixel = 0
-	toggleSlider.Size = UDim2.new(0, 20, 0, 20)
+	toggleSlider.Size = UDim2.fromOffset(20, 20)
 	toggleSlider.Position = UDim2.new(0, 2, 0.5, -10)
 	toggleSlider.ZIndex = 2
 	toggleSlider.Parent = toggleButton
@@ -2199,7 +2198,7 @@ do -- Search stuff
 	toggleStateText.TextSize = 10
 	toggleStateText.FontFace = Font.new(FONT_FAMILY.Family, Enum.FontWeight.Bold, Enum.FontStyle.Normal)
 	toggleStateText.TextXAlignment = Enum.TextXAlignment.Center
-	toggleStateText.Size = UDim2.new(1, 0, 1, 0)
+	toggleStateText.Size = UDim2.fromScale(1, 1)
 	toggleStateText.ZIndex = 1
 	toggleStateText.Parent = toggleButton
 
