@@ -79,6 +79,24 @@ local tool = game.ServerStorage.SpecialSword
 tool:SetAttribute("CanBeFavorited", true)
 ```
 
+#### Persistence (Optional)
+
+Favorites can optionally persist across game sessions using Roblox DataStore. When enabled:
+
+- Player favorites are automatically saved when toggled
+- Favorites are restored when the player rejoins the game
+- Works seamlessly across all devices
+
+**Requirements:**
+
+- The `BackpackFavorites.model.json` must be synced to ReplicatedStorage via your Rojo project
+- The `ServerFavorites.server.luau` script must be running on the server
+- DataStore API must be enabled in your game
+
+!!! note
+
+    Persistence is optional. Without the server-side components, favorites will still work during the play session but won't persist after leaving.
+
 For integration with sell/trade systems, see the [Favorites System] section in the API Reference.
 
 [Favorites System]: api-reference.md#favorites-system

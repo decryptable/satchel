@@ -14,6 +14,7 @@ local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local VRService = game:GetService("VRService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PlayerGui: Instance = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 local BackpackScript = {}
@@ -223,6 +224,12 @@ local NumberOfInventoryRows: number = IsVR and INVENTORY_ROWS_VR
 local BackpackPanel = nil
 local lastEquippedSlot: any = nil
 local UpdateFavoritesFilter: (() -> ())? = nil -- Will be set later, used to update filter display in real-time
+
+-- Server favorites integration
+local FavoritesRemote: Folder? = nil
+local SaveFavoriteEvent: RemoteEvent? = nil
+local RequestFavoritesFunction: RemoteFunction? = nil
+local ServerFavoritesCache: { [string]: { IsFavorited: boolean, FavoritedTime: number } } = {} -- Cache of favorites loaded from server
 
 local function EvaluateBackpackPanelVisibility(enabled: boolean): boolean
 	return enabled and inventoryIcon.enabled and BackpackEnabled and VRService.VREnabled
@@ -539,10 +546,24 @@ local function MakeSlot(parent: Instance, initIndex: number?): GuiObject
 		if CanBeFavorited(tool) then
 			SlotFrame.BackgroundColor3 = FAVORITE_BACKGROUND_COLOR
 		end
+		
+		-- Apply saved favorite status from server cache if available
+		if CanBeFavorited(tool) and ServerFavoritesCache[tool.Name] then
+			local savedData = ServerFavoritesCache[tool.Name]
+			if savedData.IsFavorited then
+				tool:SetAttribute("IsFavorited", true)
+				tool:SetAttribute("FavoritedTime", savedData.FavoritedTime)
+			end
+		end
 
 		-- Update favorite icon visibility
 		if FavoriteIcon then
 			FavoriteIcon.Visible = self:IsFavorited()
+		end
+		
+		-- Resort if favorited and in inventory
+		if self.Index > NumberOfHotbarSlots and self:IsFavorited() then
+			SortInventorySlots()
 		end
 	end
 
@@ -636,8 +657,10 @@ local function MakeSlot(parent: Instance, initIndex: number?): GuiObject
 		self.Tool:SetAttribute("IsFavorited", newFavoritedState)
 		
 		-- Set timestamp when favoriting
+		local favoritedTime = nil
 		if newFavoritedState then
-			self.Tool:SetAttribute("FavoritedTime", os.time())
+			favoritedTime = os.time()
+			self.Tool:SetAttribute("FavoritedTime", favoritedTime)
 		else
 			self.Tool:SetAttribute("FavoritedTime", nil)
 		end
@@ -656,7 +679,24 @@ local function MakeSlot(parent: Instance, initIndex: number?): GuiObject
 		if UpdateFavoritesFilter then
 			UpdateFavoritesFilter()
 		end
+		
+		-- Sync with server for persistence
+		if SaveFavoriteEvent and self.Tool then
+			local toolName = self.Tool.Name
+			SaveFavoriteEvent:FireServer(toolName, newFavoritedState, favoritedTime)
+			
+			-- Update local cache
+			if newFavoritedState then
+				ServerFavoritesCache[toolName] = {
+					IsFavorited = true,
+					FavoritedTime = favoritedTime
+				}
+			else
+				ServerFavoritesCache[toolName] = nil
+			end
+		end
 	end
+
 
 	function slot:Delete(): ...any
 		SlotFrame:Destroy() --NOTE: Also clears connections
@@ -2420,6 +2460,60 @@ while not Player do
 	task.wait()
 	Player = Players.LocalPlayer
 end
+
+-- Initialize favorites system
+task.spawn(function()
+	-- Wait a bit for ReplicatedStorage to be fully set up
+	task.wait(1)
+	
+	-- Try to get references to the server favorites remote events
+	local success, result = pcall(function()
+		return script.Parent.Parent.Parent.Parent:WaitForChild("BackpackFavorites", 5)
+	end)
+	
+	if success and result then
+		FavoritesRemote = result
+		SaveFavoriteEvent = FavoritesRemote:FindFirstChild("SaveFavorite") :: RemoteEvent?
+		RequestFavoritesFunction = FavoritesRemote:FindFirstChild("RequestFavorites") :: RemoteFunction?
+		
+		-- Request saved favorites from server
+		if RequestFavoritesFunction then
+			local requestSuccess, favorites = pcall(function()
+				return RequestFavoritesFunction:InvokeServer()
+			end)
+			
+			if requestSuccess and favorites then
+				ServerFavoritesCache = favorites
+				print("[ClientFavorites] Loaded favorites from server:", favorites)
+				
+				-- Apply favorites to any tools already in backpack
+				for _, slot in pairs(SlotsByTool) do
+					if slot.Tool and CanBeFavorited(slot.Tool) and ServerFavoritesCache[slot.Tool.Name] then
+						local savedData = ServerFavoritesCache[slot.Tool.Name]
+						if savedData.IsFavorited then
+							slot.Tool:SetAttribute("IsFavorited", true)
+							slot.Tool:SetAttribute("FavoritedTime", savedData.FavoritedTime)
+							
+							-- Update visual
+							if slot.Frame and slot.Frame:FindFirstChild("FavoriteIcon") then
+								slot.Frame.FavoriteIcon.Visible = true
+							end
+						end
+					end
+				end
+				
+				-- Re-sort inventory to put favorites first
+				SortInventorySlots()
+			else
+				warn("[ClientFavorites] Failed to load favorites from server:", favorites)
+			end
+		else
+			warn("[ClientFavorites] RequestFavorites RemoteFunction not found")
+		end
+	else
+		warn("[ClientFavorites] BackpackFavorites folder not found in ReplicatedStorage - favorites will not persist")
+	end
+end)
 
 -- Listen to current and all future characters of our player
 Player.CharacterAdded:Connect(OnCharacterAdded)

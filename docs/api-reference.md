@@ -507,3 +507,102 @@ local sellButton = Instance.new("TextButton")
 sellButton.Text = "Sell All (Keep Favorites)"
 sellButton.MouseButton1Click:Connect(sellAllNonFavorites)
 ```
+
+### Persistence Across Sessions
+
+Favorites can optionally persist across game sessions using Roblox DataStore. This feature is implemented using a server-side script and a JSON model for RemoteEvents.
+
+#### Architecture
+
+The persistence system uses:
+
+1. **BackpackFavorites.model.json** - Defines the RemoteEvent and RemoteFunction in ReplicatedStorage
+2. **ServerFavorites.server.luau** - Server script that handles DataStore operations
+3. **Client-side integration** - Automatically syncs favorites with the server
+
+```mermaid
+graph LR
+    Client[Client: init.luau] <-->|SaveFavorite| Server[Server: ServerFavorites]
+    Client <-->|RequestFavorites| Server
+    Server <--> DataStore[(BackpackFavorites DataStore)]
+```
+
+#### Setup Instructions
+
+**1. Project Structure**
+
+The persistence files should be organized in your Rojo project:
+
+```
+models/
+├── BackpackFavorites.model.json     # RemoteEvents definition
+└── SatchelLoader/
+    └── ServerFavorites.server.luau  # Server script
+```
+
+**2. Rojo Configuration**
+
+Add the BackpackFavorites model to your `develop.project.json`:
+
+```json
+{
+  "tree": {
+    "ReplicatedStorage": {
+      "BackpackFavorites": {
+        "$path": "models/BackpackFavorites.model.json"
+      }
+    }
+  }
+}
+```
+
+**3. Enable DataStore**
+
+Ensure DataStoreService is enabled in your game settings:
+
+- In Roblox Studio, go to Home → Game Settings → Security
+- Enable "Enable Studio Access to API Services"
+
+#### How It Works
+
+**On Player Join:**
+
+1. Server loads favorites from DataStore
+2. Client requests favorites from server via RemoteFunction
+3. Favorites are applied to tools in the backpack
+
+**On Favorite Toggle:**
+
+1. Client updates local favorite status
+2. Client sends update to server via RemoteEvent
+3. Server immediately saves to DataStore
+
+**On Player Leave:**
+
+1. Server saves final favorites to DataStore
+2. Cache is cleared
+
+#### Data Structure
+
+Favorites are stored per-player using the key `"Player_" .. userId`:
+
+```lua
+{
+  ["ToolName"] = {
+    IsFavorited = true,
+    FavoritedTime = 1234567890  -- Unix timestamp
+  }
+}
+```
+
+#### Error Handling
+
+The system includes graceful degradation:
+
+- If DataStore fails, favorites still work client-side during the session
+- All DataStore operations use `pcall` for error handling
+- Warning messages are logged to the server console
+
+!!! tip
+
+    Persistence is completely optional. Without the server-side components, the favorites system will still function normally but favorites won't persist after the player leaves.
