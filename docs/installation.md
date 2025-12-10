@@ -9,7 +9,6 @@ Satchel uses [RunContext] to run anywhere, so you do not need to move it from [W
   [RunContext]: https://devforum.roblox.com/t/1938784
   [Workspace]: https://create.roblox.com/docs/reference/engine/classes/Workspace
   [ReplicatedStorage]: https://create.roblox.com/docs/reference/engine/classes/ReplicatedStorage
-  [v1.4.0]: https://github.com/decryptable/satchel/releases/tag/v1.4.0
 
 ## Creator Store <small>recommended</small> { #creator-store data-toc-label="Creator Store" }
 
