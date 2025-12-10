@@ -82,10 +82,10 @@ You are expected to already have Wally setup in your Rojo project and basic know
 
     ``` toml title="wally.toml"
     [dependencies]
-    satchel = "ryanlua/satchel@1.0.0"
+    satchel = "decryptable/satchel@1.5.0"
     ```
 
 1. Install Satchel from Wally by running `wally install`.
 
-  [Wally]: https://wally.run/package/ryanlua/satchel
+  [Wally]: https://wally.run/package/decryptable/satchel
   [require]: https://create.roblox.com/docs/reference/engine/globals/LuaGlobals#require
