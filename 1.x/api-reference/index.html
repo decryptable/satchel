@@ -823,6 +823,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#persistence-across-sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistence Across Sessions
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1192,6 +1203,17 @@
     <span class="md-ellipsis">
       
         Integration Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#persistence-across-sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistence Across Sessions
       
     </span>
   </a>
@@ -1896,6 +1918,103 @@
 <span class="nv">sellButton</span><span class="p">.</span><span class="py">Text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Sell All (Keep Favorites)&quot;</span>
 <span class="nv">sellButton</span><span class="p">.</span><span class="py">MouseButton1Click</span><span class="p">:</span><span class="nf">Connect</span><span class="p">(</span><span class="nv">sellAllNonFavorites</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
+<h3 id="persistence-across-sessions">Persistence Across Sessions<a class="headerlink" href="#persistence-across-sessions" title="Permanent link">&para;</a></h3>
+<p>Favorites can optionally persist across game sessions using Roblox DataStore. This feature is implemented using a server-side script and a JSON model for RemoteEvents.</p>
+<h4 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h4>
+<p>The persistence system uses:</p>
+<ol>
+<li><strong>BackpackFavorites.model.json</strong> - Defines the RemoteEvent and RemoteFunction in ReplicatedStorage</li>
+<li><strong>ServerFavorites.server.luau</strong> - Server script that handles DataStore operations</li>
+<li><strong>Client-side integration</strong> - Automatically syncs favorites with the server</li>
+</ol>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span></pre></div></td><td class="code"><div><pre><span></span><code>graph LR
+    Client[Client: init.luau] &lt;--&gt;|SaveFavorite| Server[Server: ServerFavorites]
+    Client &lt;--&gt;|RequestFavorites| Server
+    Server &lt;--&gt; DataStore[(BackpackFavorites DataStore)]
+</code></pre></div></td></tr></table></div>
+<h4 id="setup-instructions">Setup Instructions<a class="headerlink" href="#setup-instructions" title="Permanent link">&para;</a></h4>
+<p><strong>1. Project Structure</strong></p>
+<p>The persistence files should be organized in your Rojo project:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span></pre></div></td><td class="code"><div><pre><span></span><code>models/
+├── BackpackFavorites.model.json     # RemoteEvents definition
+└── SatchelLoader/
+    └── ServerFavorites.server.luau  # Server script
+</code></pre></div></td></tr></table></div>
+<p><strong>2. Rojo Configuration</strong></p>
+<p>Add the BackpackFavorites model to your <code>develop.project.json</code>:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span>
+<span class="normal">5</span>
+<span class="normal">6</span>
+<span class="normal">7</span>
+<span class="normal">8</span>
+<span class="normal">9</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;tree&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;ReplicatedStorage&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;BackpackFavorites&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;$path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;models/BackpackFavorites.model.json&quot;</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+<p><strong>3. Enable DataStore</strong></p>
+<p>Ensure DataStoreService is enabled in your game settings:</p>
+<ul>
+<li>In Roblox Studio, go to Home → Game Settings → Security</li>
+<li>Enable "Enable Studio Access to API Services"</li>
+</ul>
+<h4 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h4>
+<p><strong>On Player Join:</strong></p>
+<ol>
+<li>Server loads favorites from DataStore</li>
+<li>Client requests favorites from server via RemoteFunction</li>
+<li>Favorites are applied to tools in the backpack</li>
+</ol>
+<p><strong>On Favorite Toggle:</strong></p>
+<ol>
+<li>Client updates local favorite status</li>
+<li>Client sends update to server via RemoteEvent</li>
+<li>Server immediately saves to DataStore</li>
+</ol>
+<p><strong>On Player Leave:</strong></p>
+<ol>
+<li>Server saves final favorites to DataStore</li>
+<li>Cache is cleared</li>
+</ol>
+<h4 id="data-structure">Data Structure<a class="headerlink" href="#data-structure" title="Permanent link">&para;</a></h4>
+<p>Favorites are stored per-player using the key <code>"Player_" .. userId</code>:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span>
+<span class="normal">5</span>
+<span class="normal">6</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="p">[</span><span class="s2">&quot;ToolName&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nv">IsFavorited</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nv">FavoritedTime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1234567890</span><span class="w">  </span><span class="c1">-- Unix timestamp</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+<h4 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h4>
+<p>The system includes graceful degradation:</p>
+<ul>
+<li>If DataStore fails, favorites still work client-side during the session</li>
+<li>All DataStore operations use <code>pcall</code> for error handling</li>
+<li>Warning messages are logged to the server console</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Persistence is completely optional. Without the server-side components, the favorites system will still function normally but favorites won't persist after the player leaves.</p>
+</div>
 
 
 

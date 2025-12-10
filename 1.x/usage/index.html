@@ -666,6 +666,23 @@
 <span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">tool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">game</span><span class="p">.</span><span class="py">ServerStorage</span><span class="p">.</span><span class="py">SpecialSword</span>
 <span class="nv">tool</span><span class="p">:</span><span class="nf">SetAttribute</span><span class="p">(</span><span class="s2">&quot;CanBeFavorited&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
+<h4 id="persistence-optional">Persistence (Optional)<a class="headerlink" href="#persistence-optional" title="Permanent link">&para;</a></h4>
+<p>Favorites can optionally persist across game sessions using Roblox DataStore. When enabled:</p>
+<ul>
+<li>Player favorites are automatically saved when toggled</li>
+<li>Favorites are restored when the player rejoins the game</li>
+<li>Works seamlessly across all devices</li>
+</ul>
+<p><strong>Requirements:</strong></p>
+<ul>
+<li>The <code>BackpackFavorites.model.json</code> must be synced to ReplicatedStorage via your Rojo project</li>
+<li>The <code>ServerFavorites.server.luau</code> script must be running on the server</li>
+<li>DataStore API must be enabled in your game</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Persistence is optional. Without the server-side components, favorites will still work during the play session but won't persist after leaving.</p>
+</div>
 <p>For integration with sell/trade systems, see the <a href="../api-reference/#favorites-system">Favorites System</a> section in the API Reference.</p>
 
 
